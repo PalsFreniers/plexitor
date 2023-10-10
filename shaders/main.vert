@@ -14,6 +14,8 @@ layout(location = 3) in vec4 bgcolor;
 
 uniform vec2 resolution;
 uniform vec2 scale;
+uniform vec2 camera;
+uniform float time;
 
 out vec2 uv;
 flat out int outC;
@@ -21,15 +23,16 @@ out vec4 outFGColor;
 out vec4 outBGColor;
 
 vec2 projectPoint(vec2 point) {
-    return 2.0 * point / resolution;
+        return 2.0 * (point - camera) / resolution;
 }
 
 void main() {
-    uv = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
-    vec2 charSize = vec2(float(FONT_CHARACTER_WIDTH), float(FONT_CHARACTER_HEIGHT));
-    vec2 pos = tile * charSize * scale;
-    gl_Position = vec4(projectPoint(uv * charSize * scale + pos), 0.0, 1.0);
-    outC = c;
-    outFGColor = fgcolor;
-    outBGColor = bgcolor;
+        uv = vec2(float(gl_VertexID & 1), float((gl_VertexID >> 1) & 1));
+        vec2 charSize = vec2(float(FONT_CHARACTER_WIDTH), float(FONT_CHARACTER_HEIGHT));
+        float intensity = 20.0;
+        vec2 pos = tile * charSize * scale;
+        gl_Position = vec4(projectPoint(uv * charSize * scale + pos), 0.0, 1.0);
+        outC = c;
+        outFGColor = fgcolor;
+        outBGColor = bgcolor;
 }

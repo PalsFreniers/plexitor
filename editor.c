@@ -3,6 +3,8 @@
 #define LINE_INIT_CAPACITY 1024
 #define EDITOR_INIT_CAPACITY 128
 
+Editor *p = NULL;
+
 static void LineExpand(Line* line, size_t needed) {
     size_t newCapacity = line->capacity;
     assert(line->capacity >= line->size);
@@ -18,6 +20,7 @@ static void LineExpand(Line* line, size_t needed) {
 
 void LineInsertSizedTextBefore(Line* line, const char* text, size_t size, size_t* col) {
     if(*col > line->size) *col = line->size;
+    
     LineExpand(line, size);
     memmove(line->buffer + *col + size,
             line->buffer + *col,
@@ -87,7 +90,7 @@ static void EditorFirstNewLine(Editor* editor) {
 
 void EditorInsertTextBeforeCursor(Editor* editor, const char* str) {
     EditorFirstNewLine(editor);
-    LineInsertTextBefore(&editor->lines[editor->cursor.y], str, (size_t*)&editor->cursor.x);
+    LineInsertTextBefore(&editor->lines[editor->cursor.y], str, (size_t*)&(editor->cursor.x));
 }
 
 void EditorInsertLine(Editor *editor) {

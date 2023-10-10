@@ -1,3 +1,5 @@
+#include <SDL2/SDL_events.h>
+#include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_video.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,8 +117,16 @@ void renderText(SDL_Renderer* renderer, Font* font, const char* text, Vec2f pos,
     renderSizedText(renderer, font, text, strlen(text), pos, color, scale);
 }
 
-Editor editor = {0};
-Camera cam = {0};
+Editor editor = {
+    .capacity = 0,
+    .cursor = {0, 0},
+    .lines = NULL,
+    .size = 0,
+};
+Camera cam = {
+    .position = {0, 0},
+    .velocity = {0, 0},
+};
 
 
 Vec2f windowSize(SDL_Window* window) {
@@ -129,24 +139,6 @@ Vec2f cameraProjectPoint(SDL_Window* window, Vec2f point) {
             return vec2f_add(
                     vec2f_sub(point, cam.position),
                     vec2f_mul(windowSize(window), vec2fs(0.5f)));
-}
-
-void renderCursor(SDL_Renderer* renderer, SDL_Window* window, Font* font) {
-    const Vec2f pos =
-        cameraProjectPoint(window, vec2f((float)editor.cursor.x * FONT_CHARACTER_WIDTH * FONT_SCALE, (float)editor.cursor.y * FONT_CHARACTER_HEIGHT * FONT_SCALE));
-    SDL_Rect rect = {
-        .x = (int) floorf(pos.x),
-        .y = (int) floorf(pos.y),
-        .w = (int) FONT_CHARACTER_WIDTH * FONT_SCALE,
-        .h = (int) FONT_CHARACTER_HEIGHT * FONT_SCALE
-    };
-    scc(SDL_SetRenderDrawColor(renderer, UNHEX(0xFFFFFFFF)));
-    SDL_RenderFillRect(renderer, &rect);
-    const char* c = EditorGetCharUnderCursor(&editor);
-    if(c) {
-        setTexureColor(font->spritesheet, 0xFF000000);
-        renderChar(renderer, font, *c, pos, FONT_SCALE);
-    }
 }
 
 void usage(FILE* stream, const char* str) {
@@ -207,10 +199,6 @@ char *itoa(int number, char *arr, int base)
     return arr;
 }
 
-#define OPENGL_RENDERER
-
-#ifdef OPENGL_RENDERER
-
 typedef struct {
     Vec2i tile;
     int c;
@@ -254,10 +242,14 @@ static const GlyphAttributeDefinition GlyphAttributeDefinitions[GLYPH_ATTRIBUTE_
         .type = GL_FLOAT,
     }
 };
-static_assert(GLYPH_ATTRIBUTE_COUNT == 4, "Theamout of glyph attribute haven't been modified correctly");
+static_assert(GLYPH_ATTRIBUTE_COUNT == 4, "The amout of glyph attribute haven't been modified correctly");
 
 Glyph glyphBuffer[GLYPH_BUFFER_CAPACITY] = {0};
 size_t glyphCount = 0;
+
+void glyphBufferClear() {
+	glyphCount = 0;
+}
 
 void glyphBufferPush(Glyph glyph) {
     assert(glyphCount < GLYPH_BUFFER_CAPACITY);
@@ -282,10 +274,18 @@ void glRenderSizedText(const char* text, size_t textSize, Vec2i tile, Vec4f fgCo
 void glRenderText(const char* text, Vec2i tile, Vec4f fgColor, Vec4f bgColor) {
     glRenderSizedText(text, strlen(text), tile, fgColor, bgColor);
 }
+Vec4f bgColor = {0};
+
+void renderCursor() {
+    const char *c = EditorGetCharUnderCursor(&editor);
+    Vec2i tile = vec2i(editor.cursor.x, -(int)editor.cursor.y);
+    glRenderSizedText(c ? c : " ", 1, tile, bgColor, vec4f(0.86f, 0.86f, 0.86f, 0.86f));
+}
 
 // OPENGL
 
 int main(int argc, char** argv) {
+    bgColor = vec4f(0.14f, 0.14f, 0.14f, 1.0f);
     char *filePath = NULL;
     if(argc > 1) {
         if(strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
@@ -316,6 +316,8 @@ int main(int argc, char** argv) {
     }
 
     scp(SDL_GL_CreateContext(window));
+    SDL_Surface* icon = loadFromFile("logo.png");
+    SDL_SetWindowIcon(window, icon);
 
     if(glewInit() != GLEW_OK) {
         ERROR("GLEW Initialisation failed");
@@ -342,6 +344,7 @@ int main(int argc, char** argv) {
     GLint timeUniform = 0;
     GLint resolutionUniform = 0;
     GLint scaleUniform = 0;
+    GLint cameraUniform = 0;
     {
         GLuint vertexShader = 0;
         if(!compileShaderFile("shaders/main.vert", GL_VERTEX_SHADER, &vertexShader)) {
@@ -364,6 +367,7 @@ int main(int argc, char** argv) {
         timeUniform = glGetUniformLocation(program, "time");
         resolutionUniform = glGetUniformLocation(program, "resolution");
         scaleUniform = glGetUniformLocation(program, "scale");
+        cameraUniform = glGetUniformLocation(program, "camera");
         glUniform2f(scaleUniform, FONT_SCALE, FONT_SCALE);
     }
     
@@ -411,14 +415,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    Vec4f bgColor = vec4f(0.14f, 0.14f, 0.14f, 1.0f);
 
-    const char* text = "Hello, World!";
-    char num[20] = {0};
-    itoa(1, num, 10);
-    glRenderText(text, vec2is(0), vec4f(1.0f, 1.0f, 1.0f, 1.0f), bgColor);
-    glRenderText(num, vec2i(-1 - strlen(num), 0), vec4f(1.0f, 1.0f, 1.0f, 1.0f), vec4f(0.0f, 0.0f, 0.0f, 1.0f));
-    glyphBufferSync();
 
     bool quit = false;
     while(!quit) {
@@ -463,19 +460,48 @@ int main(int argc, char** argv) {
                 case SDL_TEXTINPUT: {
                     EditorInsertTextBeforeCursor(&editor, e.text.text);
                 } break;
+                case SDL_MOUSEBUTTONDOWN: {
+                    // TODO : add cursor movement at mouse click
+                } break;
             }
         }
+
+        {
+            const Vec2f pos = vec2f((float)editor.cursor.x * FONT_CHARACTER_WIDTH * FONT_SCALE,  (float)(-(int)editor.cursor.y) * FONT_CHARACTER_HEIGHT * FONT_SCALE);
+            cam.velocity = vec2f_mul(vec2f_sub(pos, cam.position), vec2fs(SPEED));
+            cam.position = vec2f_add(cam.position, vec2f_mul(cam.velocity, vec2fs(DELTA_TIME)));
+            glUniform2f(cameraUniform, cam.position.x, cam.position.y);
+        }
+
         {
             int width, height;
             SDL_GetWindowSize(window, &width, &height);
             glViewport(0, 0, width, height);
             glUniform2f(resolutionUniform, (float)width, (float)height); 
         }
+
+	glyphBufferClear();
+
+        for(size_t row = 0; row < editor.size; row++) {
+            const Line* line = editor.lines + row;
+            glRenderSizedText(line->buffer, line->size, vec2i(0, -row), vec4f(1.0f, 1.0f, 1.0f, 1.0f), bgColor);
+            char num[32] = {0};
+            itoa(row + 1, num, 10);
+            glRenderText(num, vec2i(-1 - strlen(num), -row), vec4f(1.0f, 1.0f, 1.0f, 1.0f), bgColor); 
+        }
+
+        glyphBufferSync();
+
         glClearColor(bgColor.x, bgColor.y, bgColor.z, bgColor.w);
         glClear(GL_COLOR_BUFFER_BIT);
         
         glUniform1f(timeUniform, (float)SDL_GetTicks() / 1000.0f);
 
+        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, glyphCount);
+
+        glyphBufferClear();
+        renderCursor();
+        glyphBufferSync();
         glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, glyphCount);
 
         SDL_GL_SwapWindow(window);
@@ -486,106 +512,7 @@ int main(int argc, char** argv) {
     SDL_Quit();
     return 0;
 }
-#else
 
-// SDL
-
-int main(int argc, char** argv) {
-    char *filePath = NULL;
-    if(argc > 1) {
-        if(strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-            usage(stdout, argv[0]);
-            exit(0);
-        } else filePath = argv[1];
-    }
-
-    if(filePath) {
-        FILE* f = fopen(filePath, "r");
-        if(f != NULL) {
-            EditorLoadFromFile(&editor, f);
-            fclose(f);
-        }
-    }
-
-    scc(SDL_Init(SDL_INIT_VIDEO));
-    SDL_Window* window = scp(SDL_CreateWindow("Plexitor", 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_RESIZABLE));
-    SDL_Renderer* renderer = scp(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED));
-    Font font_texture = initFontFromFile(renderer, "font.png");
-    SDL_Surface* icon = loadFromFile("logo.png");
-    SDL_SetWindowIcon(window, icon);
-    bool quit = false;
-    while(!quit) {
-        const Uint32 start = SDL_GetTicks();
-        SDL_Event e = {0};
-        while(SDL_PollEvent(&e)) {
-            switch (e.type) {
-                case SDL_QUIT: {
-                    quit = true;
-                } break;
-                case SDL_KEYDOWN: {
-                    switch (e.key.keysym.sym) {
-                        case SDLK_F2: {
-                            if(filePath) EditorSaveToFile(&editor, filePath);
-                        } break;
-                         case SDLK_BACKSPACE: {
-                            EditorBackspace(&editor);
-                        } break;
-                        case SDLK_DELETE: {
-                            EditorDelete(&editor);
-                        } break;
-                        case SDLK_RETURN: {
-                            EditorInsertLine(&editor);
-                        } break;
-                        case SDLK_TAB: {
-                            EditorInsertTextBeforeCursor(&editor, "    ");
-                        } break;
-                        case SDLK_LEFT: {
-                            if(editor.cursor.x > 0) editor.cursor.x--;
-                        } break;
-                        case SDLK_RIGHT: {
-                            if(editor.size > 0 && editor.cursor.x < editor.lines[editor.cursor.y].size) editor.cursor.x++;
-                        } break;
-                        case SDLK_UP: {
-                            if(editor.cursor.y > 0) editor.cursor.y--;
-                        } break;
-                        case SDLK_DOWN: {
-                            if(editor.cursor.y < editor.size - 1 && editor.size > 0) editor.cursor.y++;
-                        } break;
-                    }
-                } break;
-                case SDL_TEXTINPUT: {
-                    EditorInsertTextBeforeCursor(&editor, e.text.text);
-                } break;
-            }
-        }
-        {
-            const Vec2f pos = vec2f((float)editor.cursor.x * FONT_CHARACTER_WIDTH * FONT_SCALE,  (float)editor.cursor.y * FONT_CHARACTER_HEIGHT * FONT_SCALE);
-            cam.velocity = vec2f_mul(vec2f_sub(pos, cam.position), vec2fs(SPEED));
-            cam.position = vec2f_add(cam.position, vec2f_mul(cam.velocity, vec2fs(DELTA_TIME)));
-        }
-
-        scc(SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255));
-        scc(SDL_RenderClear(renderer));
-
-        for(size_t row = 0; row < editor.size; row++) {
-            const Line* line = editor.lines + row;
-            const Vec2f linePosition = cameraProjectPoint(window, vec2f(0.0f, (float) row * FONT_CHARACTER_HEIGHT * FONT_SCALE));
-            renderSizedText(renderer, &font_texture, line->buffer, line->size, linePosition, 0xFFFFFFFF, FONT_SCALE);
-            char num[20] = {0};
-            itoa(row + 1, num, 10);
-            const Vec2f numberPosition = cameraProjectPoint(window, vec2f((-1.0f - strlen(num)) * FONT_CHARACTER_WIDTH * FONT_SCALE, (float) row * FONT_CHARACTER_HEIGHT * FONT_SCALE));
-            renderText(renderer, &font_texture, num, numberPosition, 0xFF999999, FONT_SCALE); 
-        }
-        renderCursor(renderer, window, &font_texture);
-        SDL_RenderPresent(renderer);
-
-        const Uint32 delay = SDL_GetTicks() - start;
-        const Uint32 deltaTime = 1000/FPS;
-        if(delay < deltaTime) SDL_Delay(deltaTime - delay);
-    }
-    SDL_Quit();
-    return 0;
-}
-#endif
 #define SV_IMPLEMENTATION
 #include "sv.h"
+

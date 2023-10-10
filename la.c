@@ -84,3 +84,29 @@ Vec2i vec2i_div(Vec2i a, Vec2i b) {
     return vec2i(a.x / b.x, a.y /  b.y);
 }
 
+Vec2si vec2si(size_t x, size_t y) {
+    return (Vec2si) {
+        .x = x,
+        .y = y,
+    };
+}
+
+Vec2si vec2sis(size_t x) {
+    return vec2si(x, x);
+}
+
+Vec2si vec2si_add(Vec2si a, Vec2si b) {
+    return vec2si(a.x + b.x, a.y +  b.y);
+}
+
+Vec2si vec2si_sub(Vec2si a, Vec2si b){
+    return vec2si(a.x - b.x, a.y -  b.y);
+}
+
+Vec2si vec2si_mul(Vec2si a, Vec2si b){
+    return vec2si(a.x * b.x, a.y *  b.y);
+}
+
+Vec2si vec2si_div(Vec2si a, Vec2si b) {
+    return vec2si(a.x / b.x, a.y /  b.y);
+}

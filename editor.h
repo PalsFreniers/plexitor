@@ -7,7 +7,6 @@
 #include <string.h>
 #include <assert.h>
 #include "la.h"
-#include "macros.h"
 #include "sv.h"
 
 // structures
@@ -23,7 +22,7 @@ typedef struct {
 typedef struct {
     size_t capacity;
     size_t size;
-    Vec2i cursor;
+    Vec2si cursor;
     Line* lines;
 } Editor;
 

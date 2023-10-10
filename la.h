@@ -14,6 +14,10 @@ typedef struct {
     int x, y;
 } Vec2i;
 
+typedef struct {
+    size_t x, y;
+} Vec2si;
+
 Vec2f vec2f(float x, float y);
 Vec2f vec2fs(float x);
 
@@ -37,3 +41,11 @@ Vec2i vec2i_add(Vec2i a, Vec2i b);
 Vec2i vec2i_sub(Vec2i a, Vec2i b);
 Vec2i vec2i_mul(Vec2i a, Vec2i b);
 Vec2i vec2i_div(Vec2i a, Vec2i b);
+
+Vec2si vec2si(size_t x, size_t y);
+Vec2si vec2sis(size_t x);
+
+Vec2si vec2si_add(Vec2si a, Vec2si b);
+Vec2si vec2si_sub(Vec2si a, Vec2si b);
+Vec2si vec2si_mul(Vec2si a, Vec2si b);
+Vec2si vec2si_div(Vec2si a, Vec2si b);
