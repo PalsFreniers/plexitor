@@ -1,6 +1,6 @@
 PKGS=sdl2 glew
 CC=gcc
-CFLAGS=-Wall -Wextra -std=c11 -pedantic -ggdb `pkg-config --cflags $(PKGS)`
+CFLAGS=-Wall -Wextra -Werror -std=c11 -pedantic -ggdb `pkg-config --cflags $(PKGS)`
 LIBS=`pkg-config --libs $(PKGS)` -lm
 SRC=main.c editor.c file.c glextra.c la.c 
 HEADERS=editor.h file.h glextra.h la.h macros.h stbi.h sv.h

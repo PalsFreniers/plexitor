@@ -149,7 +149,7 @@ typedef struct {
 
 typedef struct {
     size_t offset;
-    size_t components;
+    GLint components;
     GLenum type;
 } GlyphAttributeDefinition;
 
@@ -204,7 +204,7 @@ void glyphBufferSync() {
 void glRenderSizedText(const char* text, size_t textSize, Vec2i tile, Vec4f fgColor, Vec4f bgColor) {
     for(size_t i = 0; i < textSize; i++) {
         glyphBufferPush((Glyph) {
-            .tile = vec2i_add(tile, vec2i(i, 0)),
+            .tile = vec2i_add(tile, vec2i((int)i, 0)),
             .c = text[i],
             .fgColor = fgColor,
             .bgColor = bgColor,
@@ -425,10 +425,10 @@ int main(int argc, char** argv) {
 
         for(size_t row = 0; row < editor.size; row++) {
             const Line* line = editor.lines + row;
-            glRenderSizedText(line->buffer, line->size, vec2i(0, -row), vec4f(1.0f, 1.0f, 1.0f, 1.0f), bgColor);
+            glRenderSizedText(line->buffer, line->size, vec2i(0, -(int)row), vec4f(1.0f, 1.0f, 1.0f, 1.0f), bgColor);
             char num[32] = {0};
             itoa(row + 1, num, 10);
-            glRenderText(num, vec2i(-1 - strlen(num), -row), vec4f(1.0f, 1.0f, 1.0f, 1.0f), bgColor); 
+            glRenderText(num, vec2i(-1 - strlen(num), -(int)row), vec4f(1.0f, 1.0f, 1.0f, 1.0f), bgColor); 
         }
 
         glyphBufferSync();
@@ -438,12 +438,12 @@ int main(int argc, char** argv) {
         
         glUniform1f(timeUniform, (float)SDL_GetTicks() / 1000.0f);
 
-        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, glyphCount);
+        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)glyphCount);
 
         glyphBufferClear();
         renderCursor();
         glyphBufferSync();
-        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, glyphCount);
+        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (GLsizei)glyphCount);
 
         SDL_GL_SwapWindow(window);
         const Uint32 delay = SDL_GetTicks() - start;
