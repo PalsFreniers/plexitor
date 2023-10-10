@@ -58,65 +58,6 @@ SDL_Surface* loadFromFile(const char* file) {
     return scp(SDL_CreateRGBSurfaceFrom((void*)pixels, w, h, d, p, rmask, gmask, bmask, amask));
 }
 
-typedef struct {
-    SDL_Texture* spritesheet;
-    SDL_Rect glyphTable[ASCII_DISPLAY_HIGH - ASCII_DISPLAY_LOW + 1];
-} Font;
-
-Font initFontFromFile(SDL_Renderer* renderer, const char* file){
-    Font ret = {0};
-    SDL_Surface* surface = loadFromFile(file);
-    scc(SDL_SetColorKey(surface, SDL_TRUE, 0xFF000000));
-    ret.spritesheet = scp(SDL_CreateTextureFromSurface(renderer, surface));
-    SDL_FreeSurface(surface);
-    for(size_t i = ASCII_DISPLAY_LOW; i <= ASCII_DISPLAY_HIGH; ++i) {
-        const size_t index = i - ASCII_DISPLAY_LOW;
-        const size_t col = index % FONT_COLS;
-        const size_t row = index / FONT_COLS;
-        ret.glyphTable[index] = (SDL_Rect) {
-            .x = col * FONT_CHARACTER_WIDTH,
-                .y = row * FONT_CHARACTER_HEIGHT,
-                .w = FONT_CHARACTER_WIDTH,
-                .h = FONT_CHARACTER_HEIGHT
-        };
-    }
-    return ret;
-}
-
-void renderChar(SDL_Renderer* renderer, Font* font, char c, Vec2f pos, float scale) {
-    if(c == '\t') c = ' ';
-    assert(c >= ASCII_DISPLAY_LOW);
-    const size_t index = c - ASCII_DISPLAY_LOW;
-    SDL_Rect dst = (SDL_Rect) {
-        .x = (int) floorf(pos.x),
-            .y = (int) floorf(pos.y),
-            .w = (int) floorf(FONT_CHARACTER_WIDTH * scale),
-            .h = (int) floorf(FONT_CHARACTER_HEIGHT * scale)
-    };
-    scc(SDL_RenderCopy(renderer, font->spritesheet, &(font->glyphTable[index]), &dst));
-}
-
-void setTexureColor(SDL_Texture* texture, Uint32 color) {
-    scc(SDL_SetTextureColorMod(texture,
-                (color >> (8 * 0)) & 0xFF,
-                (color >> (8 * 1)) & 0xFF,
-                (color >> (8 * 2)) & 0xFF));
-    scc(SDL_SetTextureAlphaMod(texture, (color >> (8 * 3)) & 0xFF));
-}
-
-void renderSizedText(SDL_Renderer* renderer, Font* font, const char* text, int size, Vec2f pos, Uint32 color, float scale) {
-    setTexureColor(font->spritesheet, color);
-    Vec2f pen = pos;
-    for(int i = 0; i < size; i++){
-        renderChar(renderer, font, text[i], pen, scale);
-        pen.x += FONT_CHARACTER_WIDTH * scale;
-    }
-}
-
-void renderText(SDL_Renderer* renderer, Font* font, const char* text, Vec2f pos, Uint32 color, float scale) {
-    renderSizedText(renderer, font, text, strlen(text), pos, color, scale);
-}
-
 Editor editor = {
     .capacity = 0,
     .cursor = {0, 0},
